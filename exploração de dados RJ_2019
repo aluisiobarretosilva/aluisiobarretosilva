@@ -1,0 +1,289 @@
+
+pacotes <- c("plotly","tidyverse","knitr","kableExtra","car","rgl","gridExtra",
+             "PerformanceAnalytics","reshape2","rayshader","psych","pracma",
+             "polynom","rqPen","ggrepel","factoextra","sp","tmap","magick", 
+             "rmarkdown", "ggrepel", "plotly", "geobr")
+
+if(sum(as.numeric(!pacotes %in% installed.packages())) != 0){
+  instalador <- pacotes[!pacotes %in% installed.packages()]
+  for(i in 1:length(instalador)) {
+    install.packages(instalador, dependencies = T)
+    break()}
+  sapply(pacotes, require, character = T) 
+} else {
+  sapply(pacotes, require, character = T) 
+}
+
+
+library(ggx)
+library(geobr)
+library(magrittr)
+library(sf)
+library(dplyr)
+library(readxl)
+library(ggmap)
+library(ggplot2)
+library(tmaptools)
+
+
+names(X2019TX_RENDIMENTO_RJ)
+class(X2019TX_RENDIMENTO_RJ)
+summarise(X2019TX_RENDIMENTO_RJ)
+
+
+
+#ORGANIZAÇÃO DOS DADOS
+
+
+
+analise <- X2019TX_RENDIMENTO_RJ [ , 6:46]
+
+analise <- X2019TX_RENDIMENTO_RJ [ , -c(11:27)]
+
+analise_2019 <- analise [, -c(12:28)]
+analise_2019 <- analise_2019 [, 6:12]
+
+analise_2019 <- analise_2019 [, -c(3)]
+analise_2019 <- analise_2019 [6:113,]
+
+
+rm(analise)
+rm(X2019TX_RENDIMENTO_RJ)
+rm(escolas)
+
+names(analise_2019)
+
+#RENOMEANDO AS COLUNAS
+
+analise_2019 <- rename(analise_2019, codigo_escola = ...6)
+analise_2019 <- rename(analise_2019, nome_entidade = ...7)
+analise_2019 <- rename(analise_2019, dep_administrativa = ...9)
+analise_2019 <- rename(analise_2019, taxa_aprovacao = ...10)
+analise_2019 <- rename(analise_2019, taxa_reprovacao = ...28)
+analise_2019 <- rename(analise_2019, taxa_abandono = ...46)
+
+
+#DEFINICAO DOS DADOS EM CAIXAS
+
+ggplot(data = analise_2019) + geom_bar(aes(x = dep_administrativa), 
+                                              color = "blue2" , fill = "blue") +
+  geom_text(aes(x = dep_administrativa, label = ..count..), stat = "count", vjust = -0.2) +
+  labs(title = "Angra dos Reis, ensino fund. anos finais 2019",
+       subtitle = "Fonte: INEP Taxas de Rendimento Escolar",
+       x = "Dependência 
+       Administrativa", y = "Quantidade", caption = "Período: 2019") + theme_minimal()
+
+
+#PONTOS GEOMETRICOS coloridos
+
+ggplot(data = analise_2019,mapping = aes(x= taxa_aprovacao, 
+                                         y= taxa_reprovacao, color= dep_administrativa))+
+                                     geom_point()+ 
+                                  gg_("add 'relação aprovação x reprovação' as plot title")+
+                                  gg_("paint the plot title in a beautiful blue")+
+                                  gg_("set the color of the x-axis label to orange")
+
+
+
+
+
+#HISTOGRAMA POR TAXA
+
+ggplot(data = analise_2019) + geom_histogram(aes(x = taxa_aprovacao), 
+                                                    fill = "dodgerblue1",
+                                                    color = "black" , bins = 100) +
+  labs (x = "taxa de aprovação", y = "Frequência") +
+  theme_minimal() -> A
+
+ggplot(data = analise_2019) + geom_histogram(aes(x = taxa_reprovacao), 
+                                                    fill = "dodgerblue1",
+                                                    color = "black" , bins = 100) +
+  labs (x = "taxa de reprovação", y = "Frequência") +
+  theme_minimal() -> B
+
+ggplot(data = analise_2019) + geom_histogram(aes(x = taxa_abandono), 
+                                                    fill = "dodgerblue1",
+                                                    color = "black" , bins = 100) +
+  labs (x = "taxa de abandono", y = "Frequência") +
+  theme_minimal() -> C
+
+#JUNTANDO OS HISTOGRAMAS
+
+grid.arrange(A, B, C)
+
+
+#GRAFICOS DE PONTOS
+
+ggplot(analise_2019) + geom_point(aes(x = dep_administrativa,
+                                             y = taxa_aprovacao, color = taxa_aprovacao
+                                             < 70, shape = taxa_aprovacao > 50 )) +
+  labs (title = 'Relação Dep. Administrativa x Taxa de Aprovação', x = "Dependência Administrativa",
+        y = "Taxa de aprovação", caption = "Período: 2019") + theme_minimal() ->A1
+
+
+
+ggplot(analise_2019) + geom_point(aes(x = dep_administrativa,
+                                             y = taxa_reprovacao, color = taxa_reprovacao
+)) +
+  labs (title = 'Relação Dep. Administrativa x Taxa de Reprovação', x = "Dependência Administrativa",
+        y = "Taxa de reprovação", caption = "Período: 2019") + theme_minimal() ->B1
+
+
+
+ggplot(analise_2019) + geom_point(aes(x = dep_administrativa,
+                                             y = taxa_abandono, color = taxa_abandono
+)) +
+  labs (title = 'Relação Dep. Administrativa x Taxa de Abandono', x = "Dependência Administrativa",
+        y = "Taxa de abandono", caption = "Período: 2019") + theme_minimal() ->C1
+
+
+#JUNTANDO OS GRAFICOS DE PONTOS
+
+grid.arrange(A1, B1, C1)
+
+
+
+
+#RELAÇÕES ENTRE TAXAS - RELACIONANDO AS TAXAS COM PONTOS + TENDENCIA LINEAR DOS DADOS
+
+
+analise_2019 %>% 
+  ggplot() +
+  geom_point(aes(x = taxa_aprovacao, y = taxa_reprovacao), 
+             color = "dodgerblue4",
+             size = 2) +
+  geom_smooth(aes(x = taxa_aprovacao, y = taxa_reprovacao),
+              color = "darkgoldenrod3", 
+              method = "lm", 
+              formula = y ~ x, 
+              se = FALSE,
+              size = 1.2) +
+  labs(x = "Taxa de Aprovação",
+       y = "Taxa de Reprovação") +
+  theme_bw() -> B1
+
+analise_2019 %>% 
+  ggplot() +
+  geom_point(aes(x = taxa_reprovacao, y = taxa_abandono), 
+             color = "dodgerblue4",
+             size = 2) +
+  geom_smooth(aes(x = taxa_reprovacao, y = taxa_abandono),
+              color = "darkgoldenrod3", 
+              method = "lm", 
+              formula = y ~ x, 
+              se = FALSE,
+              size = 1.2) +
+  labs(x = "Taxa de Reprovação",
+       y = "Taxa de Abandono") +
+  theme_bw() -> B2
+
+analise_2019 %>% 
+  ggplot() +
+  geom_point(aes(x = taxa_abandono, y = taxa_aprovacao), 
+             color = "dodgerblue4",
+             size = 2) +
+  geom_smooth(aes(x = taxa_abandono, y = taxa_aprovacao),
+              color = "darkgoldenrod3", 
+              method = "lm", 
+              formula = y ~ x, 
+              se = FALSE,
+              size = 1.2) +
+  labs(x = "Taxa de Abandono",
+       y = "Taxa de Aprovação") +
+  theme_bw() -> B3
+
+
+
+#JUNTANDO AS CORRELACOES DE TAXAS 
+
+grid.arrange(B1,B2,B3)
+
+#CUIDANDO DOS DADOS PARA MAPA
+
+
+desempenho_ang <- analise_2019 %>% select(codigo_escola, taxa_aprovacao,
+                                                taxa_reprovacao,taxa_abandono)
+
+#CONSEGUINDO OS DADOS DAS ESCOLAS
+
+escolas <- read_schools()
+
+#GERANDO DATASET E CRIANDO COLUNAS IGUAIS E DE MESMO VALOR
+
+angra_geo_edu <- subset(escolas, escolas$name_muni== "Angra dos Reis") %>%
+                                        mutate(codigo_escola = as.numeric(code_school) )
+
+class(desempenho_ang$codigo_escola) 
+class(angra_geo_edu$codigo_escola)
+
+#JUNTANDO DADOS GEOGRÁFICOS COM MEUS DADOS
+
+angra_geo_edu <- inner_join(angra_geo_edu,desempenho_ang)
+
+
+
+
+#CONSEGUINDO DADOS GEOGRÁFICOS PARA CONSEGUIR MAPA
+
+
+geocode_OSM("Angra dos Reis")
+
+
+#PEGANDO SO OS DADOS PARA BBOX PARA GERAR MAPA
+
+geocode_OSM("Angra dos Reis")$bbox
+
+#TRANSFORMANDO O VALOR EM NUMERICO
+
+as.numeric(geocode_OSM("Angra dos Reis")$bbox)
+
+
+#ESTAMPA BASE (COM ESSE CODIGO FAÇO DE QQ CIDADE)
+
+base.angra <- get_stamenmap(bbox = as.numeric(geocode_OSM("Angra dos Reis")$bbox)
+                            , zoom = 12, force = TRUE)
+
+
+#EXECUTANDO IMAGEM DO MAPA
+
+ggmap(base.angra)
+
+
+#ADICIONAR DADOS EM CAMADAS
+
+class(angra_geo_edu)
+
+#FUNCAO PARA PLOTAR DADOS SF
+
+ggmap(base.angra) 
+
+#JUNTANDO DADOS E MAPA
+
+ggmap(base.angra) + geom_sf(data = angra_geo_edu, inherit.aes = FALSE)
+
+
+#COLORINDO AS INFORMAÇÕES QUE EU QUERO SOBREPOSTAS NO MAPA (NAO DA PRA COLORIR PONTOS)
+
+ggmap(base.angra) + geom_sf(data = angra_geo_edu, inherit.aes = FALSE, aes(
+  fill = taxa_aprovacao))
+
+names(angra_geo_edu)
+
+#SEGUNDO MODO DE GERAR MAPA - LEAFLET
+
+#USANDO LEAFLEFT
+
+library(leaflet)
+
+map <- leaflet(angra_geo_edu) %>% addTiles()
+
+map%>% addMarkers()
+
+#TREIANDO CRIACAO DE MAPAS
+
+library(RColorBrewer)
+library(rgeos)
+library(gpclib)
+library(maptools)
+install.packages("gpclib")
+
